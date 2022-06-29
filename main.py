@@ -88,6 +88,6 @@ if __name__ == "__main__":
 
 
     # fire.Fire()
-    run(chatBot, host='localhost', port=8081)
-    # chat()
+    run(chatBot, host='0.0.0.0', port=8081)
+
 
