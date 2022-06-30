@@ -5,7 +5,7 @@ import train_eval
 import fire
 from QA_data import QA_test
 from config import Config
-from bottle import get, post, request, Bottle, run, template
+from bottle import get, post, request, Bottle, run, template, view
 
 chatBot = Bottle()
 
@@ -16,67 +16,77 @@ def login():
             <meta charset="UTF-8">
         </head>
         <form action="/askme" method="post">
-            问我一点东西: <input name="Question" type="text" />
+            可以用中文问我一点问题: <input name="Question" type="text" />
             <input value="确定" type="submit" />
         </form>
     '''
 
 
 @chatBot.post('/askme') # or @route('/login', method='POST')
+@view('answer_template')
 def do_login():
     
-
     Question = request.forms.Question
 
     if Question is None:
-        return "<p>Please input somthing</p>"
+        return "请重新输入一个问题"
     else:
-        output_words = call_bot(str(Question))
         
-        answer = template('回答是：{{output_words}}', output_words=output_words)
-        return answer
+        (question_token, output_question, output_answer) = call_bot(str(Question))
+        
+        return {'Question':Question,
+                'question_token':str(question_token),
+                'output_question':output_question,
+                'output_answer':output_answer}
+
+        
+        
 
 
 
 
 def call_bot(input_sentence):
+
+    match_outcome = QA_test.match(input_sentence)
+    question_token = match_outcome["question_list"]
+    query_res = match_outcome["answer_tuple"]
     
-    query_res = QA_test.match(input_sentence)
     if(query_res == tuple()):
-        output_words = train_eval.output_answer(input_sentence, searcher, sos, eos, unknown, opt, word2ix, ix2word)
+        output_question = "没有在知识库中找到您想问的问题，会自动生成回答。"
+        output_answer = train_eval.output_answer(input_sentence, searcher, sos, eos, unknown, opt, word2ix, ix2word)
     else:
-        output_words = "您是不是要找以下问题: " + query_res[1] + '，您可以尝试这样: ' + query_res[2]
+        output_question = query_res[1]
+        output_answer = query_res[2]
     
-    # QA_test.conn.close()
-    return output_words
+    return (question_token, output_question, output_answer)
 
 
 
-def chat(**kwargs):
+# def chat(**kwargs):
     
-    opt = Config()
-    for k, v in kwargs.items(): #设置参数
-        setattr(opt, k, v)   
+#     opt = Config()
+#     for k, v in kwargs.items(): #设置参数
+#         setattr(opt, k, v)   
 
-    searcher, sos, eos, unknown, word2ix, ix2word = train_eval.test(opt)
+#     searcher, sos, eos, unknown, word2ix, ix2word = train_eval.test(opt)
 
-    if os.path.isfile(opt.corpus_data_path) == False:
-        preprocess()
+#     if os.path.isfile(opt.corpus_data_path) == False:
+#         preprocess()
 
-    while(1):
-        input_sentence = input('Ask Yanan > ')
-        if input_sentence == 'q' or input_sentence == 'quit' or input_sentence == 'exit': break
-        if opt.use_QA_first:
-            query_res = QA_test.match(input_sentence)
-            if(query_res == tuple()):
-                output_words = train_eval.output_answer(input_sentence, searcher, sos, eos, unknown, opt, word2ix, ix2word)
-            else:
-                output_words = "您是不是要找以下问题: " + query_res[1] + '，您可以尝试这样: ' + query_res[2]
-        else:
-            output_words = train_eval.output_answer(input_sentence, searcher, sos, eos, unknown, opt, word2ix, ix2word)
-        print('BOT > ',output_words)
+#     while(1):
+#         input_sentence = input('Ask Yanan > ')
+#         if input_sentence == 'q' or input_sentence == 'quit' or input_sentence == 'exit': break
+#         if opt.use_QA_first:
+#             query_res = QA_test.match(input_sentence)
+#             if(query_res == tuple()):
+#                 output_answer = train_eval.output_answer(input_sentence, searcher, sos, eos, unknown, opt, word2ix, ix2word)
+#             else:
+#                 output_answer = "您是不是想问: " + query_res[1] + '\n问题的答案是: ' + query_res[2]
+#         else:
+#             output_answer = train_eval.output_answer(input_sentence, searcher, sos, eos, unknown, opt, word2ix, ix2word)
+#         print('BOT > ',output_answer)
 
-    QA_test.conn.close()
+#     QA_test.conn.close()
 
 
 if __name__ == "__main__":
